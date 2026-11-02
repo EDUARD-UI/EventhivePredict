@@ -1,0 +1,36 @@
+# Entornos virtuales
+.venv/
+venv/
+env/
+ENV/
+
+# Archivos de caché y Python compilado
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Tests y configuración de tests
+tests/
+pytest.ini
+
+# Archivos de Docker y control de versiones
+Dockerfile
+.dockerignore
+.git/
+.gitignore
+.github/
+
+# Documentación y dependencias de desarrollo
+Documentacion_Endpoints.md
+README.md
+requirements-dev.txt
+
+# Variables de entorno locales
+.env
+.env.*
+!.env.example
+

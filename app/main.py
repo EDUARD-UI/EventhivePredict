@@ -16,6 +16,12 @@ app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_body_bytes)
 app.include_router(router, prefix="/api/v1")
 
 
+@app.get("/", tags=["health"])
+def root():
+    return {"status": "ok", "service": "eventhive-recommendations"}
+
+
 @app.get("/health", tags=["health"])
 def health():
     return {"status": "ok", "service": "eventhive-recommendations"}
+

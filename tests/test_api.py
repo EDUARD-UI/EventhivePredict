@@ -10,6 +10,21 @@ def test_health():
     assert response.json()["status"] == "ok"
 
 
+def test_root():
+    response = client.get("/")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+    assert response.json()["service"] == "eventhive-recommendations"
+
+
+def test_entrypoint_api_index():
+    from api.index import app as vercel_app
+    vercel_client = TestClient(vercel_app)
+    response = vercel_client.get("/health")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+
+
 def test_evaluate_uses_camel_case_contract():
     response = client.post(
         "/api/v1/recommendations/evaluate",
@@ -67,3 +82,71 @@ def test_openapi_follows_docs_flag():
     from app.core.config import settings
     expected = 200 if settings.docs_enabled else 404
     assert client.get("/openapi.json").status_code == expected
+
+
+def test_auth_with_service_token(monkeypatch):
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "service_token", "secret-test-token")
+
+    payload = {
+        "evento": {"id": 1, "categoriaId": 1},
+        "candidatos": [{"usuarioId": 1}],
+    }
+
+    # Sin encabezado de autorización
+    res_no_auth = client.post("/api/v1/recommendations/evaluate", json=payload)
+    assert res_no_auth.status_code == 401
+
+    # Con token incorrecto
+    res_bad_auth = client.post(
+        "/api/v1/recommendations/evaluate",
+        json=payload,
+        headers={"Authorization": "Bearer wrong-token"},
+    )
+    assert res_bad_auth.status_code == 401
+
+    # Con token correcto
+    res_valid_auth = client.post(
+        "/api/v1/recommendations/evaluate",
+        json=payload,
+        headers={"Authorization": "Bearer secret-test-token"},
+    )
+    assert res_valid_auth.status_code == 200
+
+
+def test_candidate_limits_boundary():
+    # Probar exactamente 200 candidatos (límite permitido)
+    candidatos_200 = [
+        {"usuarioId": i, "favoritosCategoria": 1}
+        for i in range(1, 201)
+    ]
+    res_200 = client.post(
+        "/api/v1/recommendations/evaluate",
+        json={"evento": {"id": 1}, "candidatos": candidatos_200},
+    )
+    assert res_200.status_code == 200
+    assert len(res_200.json()["recomendaciones"]) == 200
+
+    # Probar 201 candidatos (debe ser rechazado con 422)
+    candidatos_201 = [
+        {"usuarioId": i, "favoritosCategoria": 1}
+        for i in range(1, 202)
+    ]
+    res_201 = client.post(
+        "/api/v1/recommendations/evaluate",
+        json={"evento": {"id": 1}, "candidatos": candidatos_201},
+    )
+    assert res_201.status_code == 422
+
+
+def test_duplicate_candidates_rejected():
+    payload = {
+        "evento": {"id": 1},
+        "candidatos": [
+            {"usuarioId": 5, "favoritosCategoria": 1},
+            {"usuarioId": 5, "favoritosCategoria": 2},
+        ],
+    }
+    response = client.post("/api/v1/recommendations/evaluate", json=payload)
+    assert response.status_code == 422
+
